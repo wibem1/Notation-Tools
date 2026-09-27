@@ -13,6 +13,30 @@ function groupsFor(frags){const a=[...frags].sort((x,y)=>x.start-y.start||y.dur-
 function beam(groups,i){const g=groups[i];if(g.dur>.5+EPS)return null;const ok=x=>x&&x.dur<=.5+EPS;const same=(a,b)=>Math.floor(a.start+EPS)===Math.floor(b.start+EPS);const cont=(a,b)=>Math.abs(a.start+a.dur-b.start)<.02;const p=groups[i-1],n=groups[i+1],prev=ok(p)&&same(p,g)&&cont(p,g),next=ok(n)&&same(g,n)&&cont(g,n);const primary=!prev&&next?"begin":prev&&next?"continue":prev&&!next?"end":null;return primary?{primary,secondary:g.dur<=.25+EPS?primary:null}:null}
 function noteXML(n,staff,voice,chord,b){const d=dtype(n.dur),ticks=Math.max(1,Math.round(n.dur*DIV));let x=`<note>${chord?"<chord/>":""}${pitchXML(n.pitch)}<duration>${ticks}</duration><voice>${voice}</voice><type>${d?.[1]||"16th"}</type>${d?.[2]?"<dot/>":""}`;if(n.tieStop)x+="<tie type=\"stop\"/>";if(n.tieStart)x+="<tie type=\"start\"/>";if(b?.primary)x+=`<beam number="1">${b.primary}</beam>`;if(b?.secondary)x+=`<beam number="2">${b.secondary}</beam>`;x+=`<staff>${staff}</staff>`;if(n.tieStop||n.tieStart)x+=`<notations>${n.tieStop?'<tied type="stop"/>':""}${n.tieStart?'<tied type="start"/>':""}</notations>`;return x+"</note>"}
 function restXML(beats,staff,voice,visible=true){let out="",r=beats;for(let guard=0;r>EPS&&guard<32;guard++){const x=DUR.find(v=>v[0]<=r+EPS);if(!x)break;out+=`<note><rest${visible?"/":' print-object="no"/'}><duration>${Math.round(x[0]*DIV)}</duration><voice>${voice}</voice><type>${x[1]}</type>${x[2]?"<dot/>":""}<staff>${staff}</staff></note>`;r-=x[0]}return out}
+function applyReadableOctaves(xml){
+ const d=new DOMParser().parseFromString(xml,"application/xml"),part=d.querySelector("part");if(!part)return xml;
+ let active={1:false,2:false};
+ for(const m of [...part.querySelectorAll(":scope > measure")]){
+  let div=+(m.querySelector(":scope > attributes > divisions")?.textContent||DIV),cursor=0,last=0;
+  const children=[...m.children];
+  for(const e of children){
+   if(e.tagName==="backup"){cursor-=+(e.querySelector("duration")?.textContent||0)/div;continue}
+   if(e.tagName==="forward"){cursor+=+(e.querySelector("duration")?.textContent||0)/div;continue}
+   if(e.tagName!=="note")continue;
+   const chord=!!e.querySelector(":scope > chord"),dur=+(e.querySelector(":scope > duration")?.textContent||0)/div,staff=+(e.querySelector(":scope > staff")?.textContent||1),p=e.querySelector(":scope > pitch");
+   if(!p){if(!chord)cursor+=dur;continue}
+   const midi=pitchMidi(p),want=staff===1?midi>=81:midi<=40;
+   if(want!==active[staff]){
+    const dir=d.createElement("direction");dir.setAttribute("placement",staff===1?"above":"below");
+    const dt=d.createElement("direction-type"),os=d.createElement("octave-shift");os.setAttribute("type",want?(staff===1?"down":"up"):"stop");os.setAttribute("size","8");os.setAttribute("number",String(staff));dt.appendChild(os);dir.appendChild(dt);
+    const st=d.createElement("staff");st.textContent=String(staff);dir.appendChild(st);
+    m.insertBefore(dir,e);active[staff]=want;
+   }
+   if(!chord){last=cursor;cursor+=dur}
+  }
+ }
+ return new XMLSerializer().serializeToString(d)
+}
 export function normalizeMusicXMLForDisplay(text){
  const doc=new DOMParser().parseFromString(text,"application/xml");if(doc.querySelector("parsererror"))throw Error("MusicXML konnte nicht gelesen werden");
  const title=doc.querySelector("work-title,movement-title")?.textContent?.trim()||"Partitur",parts=[...doc.querySelectorAll("score-partwise > part")];if(!parts.length)throw Error("Keine MusicXML-Parts gefunden");
@@ -28,5 +52,5 @@ export function normalizeMusicXMLForDisplay(text){
  const maxEnd=Math.max(measureLen,...fragments.map(n=>n.start+n.dur)),count=Math.max(globalMeasures,Math.ceil(maxEnd/measureLen));
  for(let mi=0;mi<count;mi++){const ms=mi*measureLen,me=ms+measureLen;out+=`<measure number="${mi+1}">`;if(mi===0)out+=`<attributes><divisions>${DIV}</divisions><key><fifths>${fifths}</fifths></key><time><beats>${beats}</beats><beat-type>${beatType}</beat-type></time><staves>2</staves><clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef></attributes><direction><sound tempo="${tempo}"/></direction>`;
   for(const staff of [1,2]){if(staff===2)out+=`<backup><duration>${Math.round(measureLen*DIV)}</duration></backup>`;const fr=fragments.filter(n=>n.staff===staff&&n.start>=ms-EPS&&n.start<me-EPS),voices=groupsFor(fr);if(!voices.length){out+=restXML(measureLen,staff,1,true);continue}for(let vi=0;vi<voices.length;vi++){if(vi>0)out+=`<backup><duration>${Math.round(measureLen*DIV)}</duration></backup>`;const gs=voices[vi],voice=vi+1;let cursor=ms;for(let gi=0;gi<gs.length;gi++){const g=gs[gi];if(g.start>cursor+EPS)out+=restXML(g.start-cursor,staff,voice,vi===0);const b=beam(gs,gi);g.notes.forEach((n,k)=>out+=noteXML(n,staff,voice,k>0,b));cursor=Math.max(cursor,g.start+g.dur)}if(cursor<me-EPS)out+=restXML(me-cursor,staff,voice,vi===0)}}out+="</measure>"}
- return out+"</part></score-partwise>"
+ return applyReadableOctaves(out+"</part></score-partwise>")
 }
