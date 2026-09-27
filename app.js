@@ -18,7 +18,7 @@ async function abcRender(abc,label="ABC"){
 }
 async function render(){const t=type();sourceFormat=t;kind.textContent=t==="abc"?"ABC":t==="lilypond"?"LilyPond":"MusicXML";status.textContent="wird gesetzt …";box.hidden=true;stopAbc();player.stop();
  try{if(t==="abc")await abcRender(src.value);
- else if(t==="musicxml"){if(typeof window.vertaal!=="function")throw Error("MusicXML-Konverter ist nicht geladen");const doc=new DOMParser().parseFromString(src.value,"application/xml");if(doc.querySelector("parsererror"))throw Error("MusicXML ist nicht gültig");const abc=window.vertaal(doc,{m:2});if(!abc||!abc.trim())throw Error("MusicXML konnte nicht in Notation umgesetzt werden");await abcRender(abc,"MusicXML")}
+ else if(t==="musicxml"){if(typeof window.vertaal!=="function")throw Error("MusicXML-Konverter ist nicht geladen");const doc=new DOMParser().parseFromString(src.value,"application/xml");if(doc.querySelector("parsererror"))throw Error("MusicXML ist nicht gültig");const result=window.vertaal(doc,{m:2}),abc=Array.isArray(result)?result[0]:result;if(!abc||typeof abc!=="string"||!abc.trim())throw Error("MusicXML konnte nicht in Notation umgesetzt werden"+(Array.isArray(result)&&result[1]?" · "+result[1]:""));await abcRender(abc,"MusicXML")}
  else{mode="midi";const r=await lily.render(src.value);score.innerHTML=r.svg;if(r.midi){await player.load(r.midi);box.hidden=false}status.textContent="LilyPond gesetzt"+(r.midi?" · MIDI bereit":" · kein MIDI")+" · "+(r.ms??"?")+" ms"}}catch(e){status.textContent=e.message||String(e)}}
 $("#render").onclick=render;
 $("#open").onchange=async e=>{const f=e.target.files?.[0];if(!f)return;src.value=await f.text();await render()};
