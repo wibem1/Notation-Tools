@@ -1,4 +1,4 @@
-import{OpenSheetMusicDisplay}from"opensheetmusicdisplay";import{normalizeMusicXMLForDisplay}from"./musicxml-normalizer.js";import{LilyPondRenderer}from"./lilypond-renderer.js";import{MidiPlayer}from"./midi-player.js";import{musicXMLToMidiBytes}from"./musicxml-midi.js";
+import{OpenSheetMusicDisplay}from"opensheetmusicdisplay";import{parseCompositionLabMusicXML}from"./compositionlab-musicxml-parser.js";import{buildCompositionLabMusicXML}from"./compositionlab-musicxml-builder.js";import{LilyPondRenderer}from"./lilypond-renderer.js";import{MidiPlayer}from"./midi-player.js";import{musicXMLToMidiBytes}from"./musicxml-midi.js";
 const $=s=>document.querySelector(s),src=$("#source"),fmt=$("#format"),score=$("#score"),status=$("#status"),box=$("#player"),kind=$("#kind");
 const lily=new LilyPondRenderer,player=new MidiPlayer({play:$("#play"),stop:$("#stop"),seek:$("#seek"),time:$("#time"),state:status});
 let abcSynth=null,abcDuration=0,abcPlaying=false,mode="midi",sourceFormat="abc",osmdView=null;
@@ -25,7 +25,7 @@ async function abcRender(abc,label="ABC"){
 }
 async function render(){const t=type();sourceFormat=t;kind.textContent=t==="abc"?"ABC":t==="lilypond"?"LilyPond":"MusicXML";status.textContent="wird gesetzt …";box.hidden=true;stopAbc();player.stop();
  try{if(t==="abc")await abcRender(src.value);
- else if(t==="musicxml"){score.innerHTML="";osmdView=new OpenSheetMusicDisplay(score,{autoResize:true,backend:"svg",drawTitle:true});const displayXML=normalizeMusicXMLForDisplay(src.value);await osmdView.load(displayXML);osmdView.Zoom=scoreZoom;osmdView.render();const midiBytes=musicXMLToMidiBytes(src.value);stopAbc();mode="midi";await player.load(midiBytes);box.hidden=false;status.textContent="MusicXML nativ gesetzt · SoundFont-MIDI bereit"}
+ else if(t==="musicxml"){score.innerHTML="";osmdView=new OpenSheetMusicDisplay(score,{autoResize:true,backend:"svg",drawTitle:true});const displayXML=buildCompositionLabMusicXML(parseCompositionLabMusicXML(src.value));await osmdView.load(displayXML);osmdView.Zoom=scoreZoom;osmdView.render();const midiBytes=musicXMLToMidiBytes(src.value);stopAbc();mode="midi";await player.load(midiBytes);box.hidden=false;status.textContent="MusicXML nativ gesetzt · SoundFont-MIDI bereit"}
  else{mode="midi";const r=await lily.render(src.value);score.innerHTML=r.svg;if(r.midi){await player.load(r.midi);box.hidden=false}status.textContent="LilyPond gesetzt"+(r.midi?" · MIDI bereit":" · kein MIDI")+" · "+(r.ms??"?")+" ms"}}catch(e){status.textContent=e.message||String(e)}}
 let scoreZoom=1;
 function updateZoomLabel(){$("#zoomReset").textContent=Math.round(scoreZoom*100)+" %"}
