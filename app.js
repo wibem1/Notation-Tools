@@ -9,6 +9,13 @@ async function abcPlay(){if(!abcSynth)return;try{if(abcPlaying){abcSynth.pause()
 $("#play").onclick=()=>mode==="abc"?abcPlay():player.playing?player.pause():player.play().catch(e=>player.error(e));
 $("#stop").onclick=()=>mode==="abc"?stopAbc():player.stop();
 $("#seek").onchange=()=>{if(mode==="abc"&&abcSynth){abcSynth.seek(+$("#seek").value||0,"seconds");$("#time").textContent=fmtTime(+$("#seek").value||0)+" / "+fmtTime(abcDuration)}};
+function musicXmlToAbc(xmlText){
+ let xmldata;try{xmldata=window.jQuery.parseXML(xmlText)}catch(e){throw Error("MusicXML ist nicht gültig: "+(e?.message||String(e)))}
+ const options={b:4,n:0,c:0,v:0,d:8,x:0,noped:0,p:"",v1:0,stm:0,s:0,t:0,u:0,mnum:-1,m:1,addstavenum:0,rehparts:0};
+ const result=window.vertaal(xmldata,options),abc=Array.isArray(result)?result[0]:result,diag=Array.isArray(result)?result[1]:"";
+ if(!abc||typeof abc!=="string"||!abc.trim())throw Error("MusicXML-Konvertierung lieferte kein ABC"+(diag?" · "+diag:""));
+ return {abc:abc.replaceAll("[K:treble]","").replaceAll("[K:alto]","").replaceAll("[K:alto1]","").replaceAll("[K:alto2]","").replaceAll("[K:tenor]","").replaceAll("[K:bass]","").replaceAll("[K:bass3]",""),diag};
+}
 async function abcRender(abc,label="ABC"){
  const v=ABCJS.renderAbc("score",abc,{responsive:"resize"})?.[0];if(!v)throw Error(label+" konnte nicht gesetzt werden");
  player.stop();mode="abc";abcSynth=new ABCJS.synth.CreateSynth();
@@ -18,7 +25,7 @@ async function abcRender(abc,label="ABC"){
 }
 async function render(){const t=type();sourceFormat=t;kind.textContent=t==="abc"?"ABC":t==="lilypond"?"LilyPond":"MusicXML";status.textContent="wird gesetzt …";box.hidden=true;stopAbc();player.stop();
  try{if(t==="abc")await abcRender(src.value);
- else if(t==="musicxml"){if(typeof window.vertaal!=="function")throw Error("MusicXML-Konverter ist nicht geladen");let doc;try{doc=window.jQuery.parseXML(src.value)}catch(e){throw Error("MusicXML ist nicht gültig: "+(e?.message||String(e)))}const result=window.vertaal(doc,{m:2}),abc=Array.isArray(result)?result[0]:result,diag=Array.isArray(result)?result[1]:"";if(!abc||typeof abc!=="string"||!abc.trim())throw Error("MusicXML-Konvertierung fehlgeschlagen"+(diag?" · "+diag:""));await abcRender(abc,"MusicXML");if(diag)console.info("xml2abc:",diag)}
+ else if(t==="musicxml"){if(typeof window.vertaal!=="function")throw Error("MusicXML-Konverter ist nicht geladen");const converted=musicXmlToAbc(src.value);await abcRender(converted.abc,"MusicXML");if(converted.diag)console.info("xml2abc:",converted.diag)}
  else{mode="midi";const r=await lily.render(src.value);score.innerHTML=r.svg;if(r.midi){await player.load(r.midi);box.hidden=false}status.textContent="LilyPond gesetzt"+(r.midi?" · MIDI bereit":" · kein MIDI")+" · "+(r.ms??"?")+" ms"}}catch(e){status.textContent=e.message||String(e)}}
 $("#render").onclick=render;
 $("#open").onchange=async e=>{const f=e.target.files?.[0];if(!f)return;src.value=await f.text();await render()};
