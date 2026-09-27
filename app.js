@@ -12,7 +12,7 @@ async function abcRender(abc,label="ABC"){
  const v=ABCJS.renderAbc("score",abc,{responsive:"resize"})?.[0];if(!v)throw Error(label+" konnte nicht gesetzt werden");
  let m=ABCJS.synth.getMidiFile(abc,{midiOutputType:"binary"});if(m instanceof Promise)m=await m;
  if(!m)throw Error(label+"-MIDI konnte nicht erzeugt werden");
- player.load(m);box.hidden=false;status.textContent=label+" gesetzt · MIDI bereit";
+ await player.load(m);box.hidden=false;status.textContent=label+" gesetzt · MIDI bereit";
 }
 async function render(){
  const t=type();sourceFormat=t;kind.textContent=t==="abc"?"ABC":t==="lilypond"?"LilyPond":"MusicXML";
@@ -27,7 +27,7 @@ async function render(){
    if(!abc||!abc.trim())throw Error("MusicXML konnte nicht in Notation umgesetzt werden");
    await abcRender(abc,"MusicXML");
   }else{
-   const r=await lily.render(src.value);score.innerHTML=r.svg;if(r.midi){player.load(r.midi);box.hidden=false}
+   const r=await lily.render(src.value);score.innerHTML=r.svg;if(r.midi){await player.load(r.midi);box.hidden=false}
    status.textContent="LilyPond gesetzt"+(r.midi?" · MIDI bereit":" · kein MIDI")+" · "+(r.ms??"?")+" ms";
   }
  }catch(e){status.textContent=e.message||String(e)}
