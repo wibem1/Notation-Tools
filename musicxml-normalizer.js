@@ -15,24 +15,29 @@ function noteXML(n,staff,voice,chord,b){const d=dtype(n.dur),ticks=Math.max(1,Ma
 function restXML(beats,staff,voice,visible=true){let out="",r=beats;for(let guard=0;r>EPS&&guard<32;guard++){const x=DUR.find(v=>v[0]<=r+EPS);if(!x)break;out+=`<note><rest${visible?"/":' print-object="no"/'}><duration>${Math.round(x[0]*DIV)}</duration><voice>${voice}</voice><type>${x[1]}</type>${x[2]?"<dot/>":""}<staff>${staff}</staff></note>`;r-=x[0]}return out}
 function applyReadableOctaves(xml){
  const d=new DOMParser().parseFromString(xml,"application/xml"),part=d.querySelector("part");if(!part)return xml;
- let active={1:false,2:false};
+ const entries={1:[],2:[]};
  for(const m of [...part.querySelectorAll(":scope > measure")]){
-  let div=+(m.querySelector(":scope > attributes > divisions")?.textContent||DIV),cursor=0,last=0;
-  const children=[...m.children];
-  for(const e of children){
-   if(e.tagName==="backup"){cursor-=+(e.querySelector("duration")?.textContent||0)/div;continue}
-   if(e.tagName==="forward"){cursor+=+(e.querySelector("duration")?.textContent||0)/div;continue}
+  let div=+(m.querySelector(":scope > attributes > divisions")?.textContent||DIV),cursor={1:0,2:0};
+  for(const e of [...m.children]){
+   if(e.tagName==="backup"){const x=+(e.querySelector("duration")?.textContent||0)/div;cursor[1]-=x;cursor[2]-=x;continue}
+   if(e.tagName==="forward"){const x=+(e.querySelector("duration")?.textContent||0)/div;cursor[1]+=x;cursor[2]+=x;continue}
    if(e.tagName!=="note")continue;
    const chord=!!e.querySelector(":scope > chord"),dur=+(e.querySelector(":scope > duration")?.textContent||0)/div,staff=+(e.querySelector(":scope > staff")?.textContent||1),p=e.querySelector(":scope > pitch");
-   if(!p){if(!chord)cursor+=dur;continue}
-   const midi=pitchMidi(p),want=staff===1?midi>=81:midi<=40;
-   if(want!==active[staff]){
-    const dir=d.createElement("direction");dir.setAttribute("placement",staff===1?"above":"below");
-    const dt=d.createElement("direction-type"),os=d.createElement("octave-shift");os.setAttribute("type",want?(staff===1?"down":"up"):"stop");os.setAttribute("size","8");os.setAttribute("number",String(staff));dt.appendChild(os);dir.appendChild(dt);
-    const st=d.createElement("staff");st.textContent=String(staff);dir.appendChild(st);
-    m.insertBefore(dir,e);active[staff]=want;
-   }
-   if(!chord){last=cursor;cursor+=dur}
+   if(p)entries[staff]?.push({m,e,pitch:pitchMidi(p)});
+   if(!chord)cursor[staff]+=dur;
+  }
+ }
+ for(const staff of [1,2]){
+  const a=entries[staff],hot=n=>staff===1?n.pitch>=81:n.pitch<=40;
+  // A high/low passage stays octave-shifted across up to two intervening notes.
+  // This prevents isolated threshold crossings from terminating an otherwise continuous phrase.
+  const keep=a.map((n,i)=>hot(n)||([-2,-1,1,2].some(k=>a[i+k]&&hot(a[i+k]))&&
+    (a.slice(Math.max(0,i-2),Math.min(a.length,i+3)).filter(hot).length>=2)));
+  let active=false;
+  for(let i=0;i<a.length;i++){const want=keep[i];if(want===active)continue;
+   const {m,e}=a[i],dir=d.createElement("direction");dir.setAttribute("placement",staff===1?"above":"below");
+   const dt=d.createElement("direction-type"),os=d.createElement("octave-shift");os.setAttribute("type",want?(staff===1?"down":"up"):"stop");os.setAttribute("size","8");os.setAttribute("number",String(staff));dt.appendChild(os);dir.appendChild(dt);
+   const st=d.createElement("staff");st.textContent=String(staff);dir.appendChild(st);m.insertBefore(dir,e);active=want;
   }
  }
  return new XMLSerializer().serializeToString(d)
