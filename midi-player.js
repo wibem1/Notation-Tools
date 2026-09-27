@@ -22,7 +22,7 @@ export class MidiPlayer {
     if(this.u.state)this.u.state.textContent="Instrumente laden …";
     await new Promise((ok,no)=>{this.fp.loader.startLoad(this.ac,"https://surikov.github.io/webaudiofontdata/sound/"+code+"_FluidR3_GM_sf2_file.js",name);this.fp.loader.waitLoad(()=>{const p=window[name];if(!p)return no(new Error("Instrument "+program+" fehlt"));try{this.fp.loader.decodeAfterLoading(this.ac,name)}catch{}this.cache.set(program,p);ok()})});return this.cache.get(program);
   }
-  load(bytes){this.cancel();this.bytes=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);this.midi=new Midi(this.bytes);this.duration=this.midi.duration||0;this.offset=0;this.u.seek.max=String(Math.max(.01,this.duration));this.show(0)}
+  async load(data){this.cancel();let bytes;if(data instanceof Blob)bytes=new Uint8Array(await data.arrayBuffer());else if(data instanceof ArrayBuffer)bytes=new Uint8Array(data);else if(ArrayBuffer.isView(data))bytes=new Uint8Array(data.buffer,data.byteOffset,data.byteLength);else throw new Error("Unbekanntes MIDI-Datenformat");this.bytes=new Uint8Array(bytes);this.midi=new Midi(this.bytes);this.duration=this.midi.duration||0;this.offset=0;this.u.seek.max=String(Math.max(.01,this.duration));this.show(0)}
   getMidiBytes(){return this.bytes}cancel(){try{this.fp?.cancelQueue(this.ac)}catch{}if(this.timer){clearInterval(this.timer);this.timer=null}}
   pause(){if(this.playing&&this.ac)this.offset=Math.min(this.duration,this.offset+Math.max(0,this.ac.currentTime-this.startedAt));this.cancel();this.playing=false;this.u.play.textContent="▶︎";this.show(this.offset)}
   stop(){this.cancel();this.playing=false;this.offset=0;this.u.play.textContent="▶︎";this.show(0)}
