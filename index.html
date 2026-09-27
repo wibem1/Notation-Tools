@@ -1,0 +1,7 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Notation Tools 0.1.0</title><link rel="stylesheet" href="./style.css"></head><body><header><strong>Notation Tools <small>0.1.0</small></strong><nav><label>Öffnen <input id="open" type="file" accept=".abc,.ly,.ily" hidden></label><button id="save">Speichern</button><select id="format"><option value="auto">Format automatisch</option><option value="abc">ABC</option><option value="lilypond">LilyPond</option></select><button id="render">Noten erzeugen</button></nav></header><main><section><h2>Quelle</h2><textarea id="source">X:1
+T:Notation Tools
+M:4/4
+L:1/4
+Q:1/4=120
+K:C
+C D E F | G2 G2 |</textarea></section><section><div class="row"><h2>Partitur</h2><span id="kind"></span></div><div id="player" class="row" hidden><button id="play">▶︎</button><button id="stop">■</button><input id="seek" type="range" min="0" max="1" step=".01" value="0"><span id="time">0:00 / 0:00</span></div><div id="score" class="score">ABC oder LilyPond öffnen.</div><pre id="status">bereit</pre></section></main><script src="https://cdn.jsdelivr.net/npm/abcjs@6.5.2/dist/abcjs-basic-min.js"></script><script type="module" src="./app.js"></script></body></html>
